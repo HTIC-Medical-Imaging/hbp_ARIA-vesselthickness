@@ -98,7 +98,7 @@ end
 % Extract images and check they are the correct size
 bw = vessel_data.bw;
 im = vessel_data.im;
-if isempty(bw) || isempty(bw) || ~isequal(size(bw), size(im))
+if isempty(bw) || isempty(im) || ~isequal(size(bw), size(im))
     error('CENTRE_SPLINE_FIT requires binary and original images of the same size (i.e. BW and IM properites in VESSEL_DATA)');
 end
 
