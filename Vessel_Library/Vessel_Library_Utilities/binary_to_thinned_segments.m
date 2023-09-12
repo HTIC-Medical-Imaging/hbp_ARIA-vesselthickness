@@ -36,7 +36,9 @@ end
 
 % Thin the binary image
 bw_thin = bwmorph(bw, 'thin', Inf);
-
+if sum(bw_thin(:))<spur_length*5
+    spur_length = fix(0.2*sum(bw_thin(:)));
+end
 % Find the branch and end points based upon a count of 'on' neighbours
 neighbour_count = imfilter(uint8(bw_thin), ones(3));
 bw_branches = neighbour_count > 3 & bw_thin;

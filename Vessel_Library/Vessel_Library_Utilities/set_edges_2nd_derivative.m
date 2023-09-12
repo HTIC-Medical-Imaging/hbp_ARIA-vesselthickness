@@ -198,14 +198,17 @@ for ii = 1:numel(vessels)
     % Compute the side points, and store them
     rows = (1:n_profiles)';
     inds_found = isfinite(col_left) & isfinite(col_right);
-    vessels(ii).side1(inds_found, :) = get_side(im_profiles_rows, im_profiles_cols, rows(inds_found), col_left(inds_found));
-    vessels(ii).side2(inds_found, :) = get_side(im_profiles_rows, im_profiles_cols, rows(inds_found), col_right(inds_found));
-    
+    if true
+        vessels(ii).side1(inds_found, :) = get_side(im_profiles_rows, im_profiles_cols, rows(inds_found), col_left(inds_found));
+        vessels(ii).side2(inds_found, :) = get_side(im_profiles_rows, im_profiles_cols, rows(inds_found), col_right(inds_found));
+    else
     % Alternatively, could use this (but it's a bit slower)
-%     vessels(ii).side1(inds_found, :) = [interp2(im_profiles_rows, col_left(inds_found), rows(inds_found), '*linear'), ...
-%                                         interp2(im_profiles_cols, col_left(inds_found), rows(inds_found), '*linear')];
-%     vessels(ii).side2(inds_found, :) = [interp2(im_profiles_rows, col_right(inds_found), rows(inds_found), '*linear'), ...
-%                                         interp2(im_profiles_cols, col_right(inds_found), rows(inds_found), '*linear')];
+        
+        vessels(ii).side1(inds_found, :) = [interp2(im_profiles_rows, double(col_left(inds_found)), double(rows(inds_found)), '*linear'), ...
+                                            interp2(im_profiles_cols, double(col_left(inds_found)), double(rows(inds_found)), '*linear')];
+        vessels(ii).side2(inds_found, :) = [interp2(im_profiles_rows, double(col_right(inds_found)), double(rows(inds_found)), '*linear'), ...
+                                            interp2(im_profiles_cols, double(col_right(inds_found)), double(rows(inds_found)), '*linear')];
+    end
 end
 
 

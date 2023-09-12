@@ -73,6 +73,26 @@ end
 
 % Get indices for the 'on' pixels of each centre line segment
 cc = bwconncomp(bw_segments);
+assert(cc.NumObjects > 0)
+if cc.NumObjects == 1 || true
+    c1= find(max(bw_segments,[],1),1,'first');
+    cend= find(max(bw_segments,[],1),1,'last');
+    r1= find(max(bw_segments,[],2),1,'first');
+    rend= find(max(bw_segments,[],2),1,'last');
+    if cend-c1 > rend-r1
+        nsel = fix((cend-c1)/100);
+%         csel = randi([c1,cend],[1,nsel]);
+        csel = fix(linspace(c1,cend,nsel));
+        bw_segments(:,csel)=0;
+    else
+        nsel = fix((rend-r1)/100);
+%         rsel = randi([r1,rend],[1,nsel]);
+        rsel = fix(linspace(r1,rend,nsel));
+        bw_segments(rsel,:)=0;
+    end
+    cc = bwconncomp(bw_segments);
+end
+% assert(cc.NumObjects > 1)
 
 % Create an array of vessels to store centre pixel locations in [row, col] form
 vessels(cc.NumObjects) = Vessel;
