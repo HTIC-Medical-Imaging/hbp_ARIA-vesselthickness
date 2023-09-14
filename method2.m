@@ -67,7 +67,7 @@ for k=1:length(B_vz)
     ext_k2 = imdilate(ext_k,ones(31,1));
     int_k3 = int_k2 & ~ext_k2;
     intv = get_intervals(int_k3);
-    pplist = fit_splines(boundpts, intv, 51);
+    pplist = fit_splines(boundpts, intv, 71);
     
     for j = 1:length(pplist)
         if ~isempty(pplist(j).pp)

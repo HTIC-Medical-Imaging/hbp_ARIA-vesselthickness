@@ -1,7 +1,7 @@
 function main(biosampleid, imgno)
 
-addpath('Vessel_Library\Vessel_Library_Utilities')
-addpath('Vessel_Classes\')
+addpath('src\Vessel_Library\Vessel_Library_Utilities')
+addpath('src\Vessel_Classes\')
 
 % biosampleid=147;
 % imgno = 409;
