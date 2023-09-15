@@ -72,6 +72,8 @@ contour_inner = struct('bpts',B_vz{1},'val',val_vz{1},'concave',true);
 [profilelines,innerpts, outpts] = match_contours(contour_outer,contour_inner,DM);
 
 profiledatalist = measure_profiledata(lmapdata,profilelines,mpp);
+% bs/secno/structure
+% pt1,pt2,len
 
 fi = plotprofiles(combined, profilelines, profiledatalist);
 
@@ -80,6 +82,12 @@ plot(innerpts(:,2),innerpts(:,1),'rx') %,'linewidth',2)
 plot(outpts(:,2),outpts(:,1),'bx') %,'linewidth',2)
 hold off
 
+
+outputdir = [datadir '/' num2str(imgno) '_marked2'];
+mkdir(outputdir)
+writeprofilecsv(outputdir,selnames,'1',profiledatalist)
+saveas(fi,[outputdir '/markings-1.png'])
+save([outputdir '/data-1.mat'],"profiledatalist",'profilelines')
 
 %%
 % pairing cp-2 and vz-2
@@ -96,6 +104,12 @@ figure(fi),hold on
 plot(innerpts2(:,2),innerpts2(:,1),'rx') %,'linewidth',2)
 plot(outpts2(:,2),outpts2(:,1),'bx') %,'linewidth',2)
 hold off
+
+outputdir = [datadir '/' num2str(imgno) '_marked2'];
+mkdir(outputdir)
+writeprofilecsv(outputdir,selnames,'2',profiledatalist)
+saveas(fi,[outputdir '/markings-2.png'])
+save([outputdir '/data-2.mat'],"profiledatalist2",'profilelines2')
 
 %% -- older attempt - shortest distance from int to ext
 
