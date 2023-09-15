@@ -15,7 +15,7 @@ function pplist = fit_splines(boundarypts,intervals, piece_spacing)
         else
             selpts = boundarypts(intervals(ni,1):intervals(ni,2),:);
             [pp,pd, smoothedpts, normals ] = fit_spline(selpts, piece_spacing);
-            pplist(ni) = struct('pp',pp,'pd',pd,'smoothedpts',smoothedpts,'normals',normals);
+            pplist(ni) = struct('pp',pp,'pd',pd,'pts',selpts,'smoothedpts',smoothedpts,'normals',normals);
         end
     end
 
