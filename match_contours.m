@@ -1,60 +1,73 @@
-function [lineslist, innerpts, outpts] = match_contours(c_outer,c_inner,DM)
+function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, vz_within_cp, DM, sgn, sp_piece_spacing)
 
 % int => closer to ventricle (interior)
 % ext => closer to surface (exterior)
-
     
-    lbl_outer = label_boundindices(c_outer.val, 1);
-    
-    cls = 2;
-    if ~c_outer.concave
-        cls=1;
+    if nargin == 5
+        sp_piece_spacing = 31;
     end
-    outpts=c_outer.bpts(lbl_outer==cls,:); 
+
+    cls_cp = 2;
+    cls_vz = 1;
+    if ~vz_within_cp
+        cls_cp = 1;
+        cls_vz = 2;
+    end
+
+    cp_pts = [];
+    for k = 1:length(contour_cp)
+        lbl_cp = label_boundindices(contour_cp(k).val, 2);
     
+        cp_pts=cat(1,cp_pts,contour_cp(k).bpts(lbl_cp==cls_cp,:)); 
+    end
 %---
 
-    lbl_inner = label_boundindices(c_inner.val, 1);
-    
-    cls = 1;
-    
-    if ~c_inner.concave
-        cls=2;
-    
-    end
-    intv = get_intervals(lbl_inner==cls);
-    
-    innerpts = c_inner.bpts(lbl_inner==cls,:);
-
-    pplist = fit_splines(c_inner.bpts, intv, 91);
-    
+    vz_pts = [];
     lineslist = [];
-    for j = 1:length(pplist)
-        if ~isempty(pplist(j).pp)
-            selpts = pplist(j).smoothedpts(20:10:end,:);
-            selnormals = pplist(j).normals(20:10:end,:);
-            % quiver(selpts(:,2),selpts(:,1),selnormals(:,2),selnormals(:,1),3);
-            ind = sub2ind(size(DM),fix(selpts(:,1)),fix(selpts(:,2)));
-            lengths = DM(ind)*1.5;
-            % p2 = p1+ul
-            otherpts = get_boundedpts([selpts(:,1) + selnormals(:,1).*lengths, ...
-                         selpts(:,2) + selnormals(:,2).*lengths],size(DM));
-            
-            startpts = get_boundedpts([selpts(:,1)-selnormals(:,1)*5,...
-                        selpts(:,2)-selnormals(:,2)*5],size(DM));
-            for k=1:length(selpts)
-                ln_k=struct('p1',startpts(k,:), 'p2',otherpts(k,:),'u',selnormals(k,:));
-                if isempty(lineslist)
-                    lineslist=ln_k;
-                else
-                    lineslist(end+1)=ln_k;
-                end
-            end
+    for k=1:length(contour_vz)
+        lbl_vz = label_boundindices(contour_vz(k).val, 3);
+    
+        intv = get_intervals(lbl_vz==cls_vz,sp_piece_spacing);
+    
+        vz_pts = cat(1,vz_pts,contour_vz(k).bpts(lbl_vz==cls_vz,:));
+
+        pplist = fit_splines(contour_vz(k).bpts, intv, sp_piece_spacing);
+    
+    
+        for j = 1:length(pplist)
+            if ~isempty(pplist(j).pp)
+                selpts = pplist(j).smoothedpts(20:10:end,:);
+                selnormals = pplist(j).normals(20:10:end,:);
+                % quiver(selpts(:,2),selpts(:,1),selnormals(:,2),selnormals(:,1),3);
+                ind = sub2ind(size(DM),fix(selpts(:,1)),fix(selpts(:,2)));
+    
+                length_multiplier = 1.5; % FIXME
+                lengths = sgn*DM(ind)*length_multiplier;
                 
-%             X = [selpts(:,2)';otherpts(:,2)']; % 2n x 1
-%             Y = [selpts(:,1)';otherpts(:,1)'];
-%             line(X,Y)
+                % p2 = p1+ul
+                otherpts = get_boundedpts([selpts(:,1) + selnormals(:,1).*lengths, ...
+                             selpts(:,2) + selnormals(:,2).*lengths],size(DM));
+                
+                length_multiplier_back = 20;  % FIXME 
+                npix_back = sgn*length_multiplier_back;
+                startpts = get_boundedpts([selpts(:,1)-selnormals(:,1)*npix_back,...
+                            selpts(:,2)-selnormals(:,2)*npix_back],size(DM));
+    
+                for k=1:length(selpts)
+                    ln_k=struct('p1',startpts(k,:), 'p2',otherpts(k,:),'u',selnormals(k,:));
+                    if isempty(lineslist)
+                        lineslist=ln_k;
+                    else
+                        lineslist(end+1)=ln_k; % FIXME: only place with end+1 append
+                    end
+                end
+                    
+    %             X = [selpts(:,2)';otherpts(:,2)']; % 2n x 1
+    %             Y = [selpts(:,1)';otherpts(:,1)'];
+    %             line(X,Y)
+            end
         end
+
     end
 
 %%

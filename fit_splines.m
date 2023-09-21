@@ -10,13 +10,16 @@ function pplist = fit_splines(boundarypts,intervals, piece_spacing)
     % pplist = {};
     for ni = 1:size(intervals,1)
         if intervals(ni,2)-intervals(ni,1)<piece_spacing
-            % pplist{ni}=[];
+%             pplist(ni).pp=[];
             continue
         else
             selpts = boundarypts(intervals(ni,1):intervals(ni,2),:);
             [pp,pd, smoothedpts, normals ] = fit_spline(selpts, piece_spacing);
             pplist(ni) = struct('pp',pp,'pd',pd,'pts',selpts,'smoothedpts',smoothedpts,'normals',normals);
         end
+    end
+    if ~exist('pplist','var')
+        pplist = [];
     end
 
 
