@@ -44,32 +44,62 @@ end
 rgn_vz = lmapdata{7};
 rgn_cp = lmapdata{3};
 
+disp('initialized')
 %% ROI selection
 
-msgbox('select CP ROI followed by VZ ROI (or escape)','modal')
+% msgbox('select CP ROI followed by VZ ROI (or escape)','modal')
+sz = size(rgn_cp);
+ROI_cp = [1,1,sz(2)-1,sz(1)-1];
+ROI_vz = ROI_cp;
+% dispimg = uint8(rgn_cp>0)*100+uint8(rgn_vz>0)*200;
+% figure(1),imshow(dispimg,[])    
+% 
+% rect_cp = drawrectangle('Label','CP region','LabelAlpha',0.2);
+% wait(rect_cp)
+% ROI_cp = rect_cp.Position;
+% 
+% assert(~isempty(ROI_cp))
+% 
+% rect_vz = drawrectangle('Label','Nested VZ region','labelalpha',0.2,'DrawingArea',ROI_cp);
+% wait(rect_vz)
+% ROI_vz = rect_vz.Position;
+% if isempty(ROI_vz)
+%     disp('use cp ROI for vz')
+%     ROI_vz = ROI_cp;
+% end
 
-dispimg = uint8(rgn_cp>0)*100+uint8(rgn_vz>0)*200;
-figure(1),imshow(dispimg,[])    
+%% cut rgn_vz and rgn_cp across at the centroid, along minor axis
 
-rect_cp = drawrectangle('Label','CP region','LabelAlpha',0.2);
-wait(rect_cp)
-ROI_cp = rect_cp.Position;
-
-assert(~isempty(ROI_cp))
-
-rect_vz = drawrectangle('Label','Nested VZ region','labelalpha',0.2,'DrawingArea',ROI_cp);
-wait(rect_vz)
-ROI_vz = rect_vz.Position;
-if isempty(ROI_vz)
-    disp('use cp ROI for vz')
-    ROI_vz = ROI_cp;
-end
-
-%%
-
-msk_cp = get_mask_outside(size(rgn_cp),ROI_cp);
-rgn_cp_masked = rgn_cp & msk_cp;
+msk_cp = get_mask_outside(sz,ROI_cp);
 msk_vz = get_mask_outside(size(rgn_vz),ROI_vz);
+
+
+% box_cp = regionprops(single(rgn_cp>0),'BoundingBox').BoundingBox;
+% mid_cp = box_cp(1:2)+box_cp(3:4)./2; % c,r
+mid_cp = regionprops(single(rgn_cp>0),'Centroid').Centroid;
+ori = regionprops(single(rgn_cp>0),'Orientation').Orientation*pi/180;
+
+v = [cos(ori),sin(ori)]; % direction of minor axis
+% x = a cos(ori)
+amin = mid_cp(1)/cos(ori);
+for a = 1:amin-5
+    pt = fix(mid_cp - a*v);
+    msk_cp(pt(2)-1:pt(2)+1,pt(1)-1:pt(1)+1)=0;
+    msk_vz(pt(2)-1:pt(2)+1,pt(1)-1:pt(1)+1)=0;
+end
+amax = (sz(2)-mid_cp(1))/cos(ori);
+for a = 1:fix(amax)
+    pt = fix(mid_cp + a*v);
+    msk_cp(pt(2)-1:pt(2)+1,pt(1)-1:pt(1)+1)=0;
+    msk_vz(pt(2)-1:pt(2)+1,pt(1)-1:pt(1)+1)=0;
+end
+% msk_cp(:,fix(mid_cp(1)))=0;
+% msk_cp(fix(mid_cp(2)),:)=0;
+
+% msk_vz(:,fix(mid_cp(1)))=0;
+% msk_vz(fix(mid_cp(2)),:)=0;
+
+rgn_cp_masked = rgn_cp & msk_cp;
 rgn_vz_masked = rgn_vz & msk_vz;
 
 
@@ -85,26 +115,46 @@ plotcontours(fi,B_cp,'cp')
 plotcontours(fi,B_vz,'vz')
 legend show
 
+%% pairing by nearest
+pairings = find_pairing(B_vz,B_cp,sz);
+for ii=1:length(pairings)
+    vzpts = B_vz{pairings(ii,1)};
+    cppts = B_cp{pairings(ii,2)};
+
+    fi=figure(2);
+    imshow(img)
+    hold on
+    
+    plot(vzpts(:,2),vzpts(:,1),'-','linewidth',2)
+    plot(cppts(:,2),cppts(:,1),'-','linewidth',2)
+    title(num2str(pairings(ii,:)))
+    hold off
+    pause
+end
+
 %% 
 % pairing cp-n and vz-n
-selected = struct('cp',[],'vz',[],'vz_within_cp',true,'sgn',1);
+selected = struct('cp',[],'vz',[],'sgn',1);
 
-selected(1) = struct('cp',1,'vz',1, 'vz_within_cp',true,'sgn',1);
+idx = 2;
+% encl = enclosing(B_cp{pairings(idx,2)},B_vz{pairings(idx,1)},sz);
+selected(idx) = struct('cp',pairings(idx,2),'vz',pairings(idx,1), 'sgn',1);
 
 
 % FIXME - try sgn = -1 (default 1)
 
-selected(2) = struct('cp',[2,-3],'vz',2,'vz_within_cp',false,'sgn',1);
+% selected(2) = struct('cp',[2,-6],'vz',1,'vz_within_cp',false,'sgn',1);
 % to show that 3 is a child of 2
 
 %% Match side A of VZ and side B of CP
 % depending on Vz_within_cp (usually true -> A is inner, B is outer)
 
-sel = selected(2)
+sel = selected(idx)
 selmsk_cp = select_in_labelmatrix(L_cp,sel.cp);
 selmsk_vz = select_in_labelmatrix(L_vz,sel.vz);
 [val_cp, cen_cp] = group_points(B_cp(abs(sel.cp)),selmsk_cp,'pts');
 [val_vz, cen_vz] = group_points(B_vz(abs(sel.vz)),selmsk_vz,'bbox');
+
 
 %%
 boximg = 0*rgn_cp;
@@ -118,7 +168,7 @@ contour_cp = struct('bpts',B_cp(abs(sel.cp)),'val',val_cp');
 
 contour_vz = struct('bpts',B_vz(abs(sel.vz)),'val',val_vz');
 
-[profilelines,vz_pts, cp_pts] = match_contours(contour_cp,contour_vz, sel.vz_within_cp, DM, sel.sgn);
+[profilelines,vz_pts, cp_pts] = match_contours(contour_cp,contour_vz, DM, sel.sgn,sz);
 
 % figure(fi),hold on
 figure(2),imshow(dispimg,[])

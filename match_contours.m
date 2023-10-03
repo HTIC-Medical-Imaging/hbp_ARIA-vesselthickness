@@ -1,4 +1,4 @@
-function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, vz_within_cp, DM, sgn, sp_piece_spacing)
+function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, DM, sgn, shp,sp_piece_spacing)
 
 % int => closer to ventricle (interior)
 % ext => closer to surface (exterior)
@@ -6,7 +6,7 @@ function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, vz
     if nargin == 5
         sp_piece_spacing = 31;
     end
-
+    vz_within_cp = enclosing(contour_cp.bpts,contour_vz.bpts,shp);
     cls_cp = 2;
     cls_vz = 1;
     if ~vz_within_cp
@@ -95,3 +95,12 @@ function RC2 = get_boundedpts(RC,siz)
     R2 = min(nr,max(1,R));
     C2 = min(nc,max(1,C));
     RC2 = [R2,C2];
+
+%%
+function out = enclosing(pts_cp,pts_vz,shp)
+    
+    cp_hull = hull_mask(pts_cp,shp);
+    pts_vz_lin = sub2ind(shp,pts_vz(:,1),pts_vz(:,2));
+    v = cp_hull(pts_vz_lin);
+    out = sum(v==1) > sum(v==0);
+
