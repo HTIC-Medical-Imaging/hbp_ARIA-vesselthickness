@@ -4,9 +4,9 @@ function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, DM
 % ext => closer to surface (exterior)
     
     if nargin == 5
-        sp_piece_spacing = 31;
+        sp_piece_spacing = 51;
     end
-    vz_within_cp = enclosing(contour_cp.bpts,contour_vz.bpts,shp);
+    vz_within_cp = enclosing(contour_cp.bpts,contour_vz.bpts,shp) | within_box(contour_cp.bpts,contour_vz.bpts)
     cls_cp = 2;
     cls_vz = 1;
     if ~vz_within_cp
@@ -48,7 +48,7 @@ function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, DM
                 otherpts = get_boundedpts([selpts(:,1) + selnormals(:,1).*lengths, ...
                              selpts(:,2) + selnormals(:,2).*lengths],size(DM));
                 
-                length_multiplier_back = 20;  % FIXME 
+                length_multiplier_back = 10;  % FIXME 
                 npix_back = sgn*length_multiplier_back;
                 startpts = get_boundedpts([selpts(:,1)-selnormals(:,1)*npix_back,...
                             selpts(:,2)-selnormals(:,2)*npix_back],size(DM));
@@ -99,8 +99,20 @@ function RC2 = get_boundedpts(RC,siz)
 %%
 function out = enclosing(pts_cp,pts_vz,shp)
     
-    cp_hull = hull_mask(pts_cp,shp);
+    cp_hull = hull_mask(pts_cp,shp,1);
     pts_vz_lin = sub2ind(shp,pts_vz(:,1),pts_vz(:,2));
     v = cp_hull(pts_vz_lin);
     out = sum(v==1) > sum(v==0);
 
+%%
+function out = within_box(pts_cp,pts_vz)
+
+    rc_min = min(pts_cp,[],1);
+    rmin = rc_min(1);
+    cmin = rc_min(2);
+    rc_max = max(pts_cp,[],1);
+    rmax = rc_max(1);
+    cmax = rc_max(2);
+
+    v = (pts_vz(:,1)>rmin) & (pts_vz(:,1) < rmax) & (pts_vz(:,2)>cmin) & (pts_vz(:,2)<cmax);
+    out = sum(v==1) > sum(v==0);

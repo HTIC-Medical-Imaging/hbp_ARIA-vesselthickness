@@ -44,13 +44,14 @@ end
 rgn_vz = lmapdata{7};
 rgn_cp = lmapdata{3};
 
+sz = size(rgn_cp);
+
 disp('initialized')
+
 %% ROI selection
 
 % msgbox('select CP ROI followed by VZ ROI (or escape)','modal')
-sz = size(rgn_cp);
-ROI_cp = [1,1,sz(2)-1,sz(1)-1];
-ROI_vz = ROI_cp;
+
 % dispimg = uint8(rgn_cp>0)*100+uint8(rgn_vz>0)*200;
 % figure(1),imshow(dispimg,[])    
 % 
@@ -68,40 +69,22 @@ ROI_vz = ROI_cp;
 %     ROI_vz = ROI_cp;
 % end
 
-%% cut rgn_vz and rgn_cp across at the centroid, along minor axis
-
-msk_cp = get_mask_outside(sz,ROI_cp);
-msk_vz = get_mask_outside(size(rgn_vz),ROI_vz);
+%% cut rgn_vz and rgn_cp across at the centroid, along 
+% 1. minor axis-pi/2
+% 2. minor axis+pi/2
 
 
 % box_cp = regionprops(single(rgn_cp>0),'BoundingBox').BoundingBox;
 % mid_cp = box_cp(1:2)+box_cp(3:4)./2; % c,r
 mid_cp = regionprops(single(rgn_cp>0),'Centroid').Centroid;
+mid_cp_rc = [mid_cp(2),mid_cp(1)];
 ori = regionprops(single(rgn_cp>0),'Orientation').Orientation*pi/180;
+msk_sectors = get_sector_mask(sz,mid_cp_rc,[ori-pi/2,ori-pi/4,ori,ori+pi/4]);
 
-v = [cos(ori),sin(ori)]; % direction of minor axis
-% x = a cos(ori)
-amin = mid_cp(1)/cos(ori);
-for a = 1:amin-5
-    pt = fix(mid_cp - a*v);
-    msk_cp(pt(2)-1:pt(2)+1,pt(1)-1:pt(1)+1)=0;
-    msk_vz(pt(2)-1:pt(2)+1,pt(1)-1:pt(1)+1)=0;
-end
-amax = (sz(2)-mid_cp(1))/cos(ori);
-for a = 1:fix(amax)
-    pt = fix(mid_cp + a*v);
-    msk_cp(pt(2)-1:pt(2)+1,pt(1)-1:pt(1)+1)=0;
-    msk_vz(pt(2)-1:pt(2)+1,pt(1)-1:pt(1)+1)=0;
-end
-% msk_cp(:,fix(mid_cp(1)))=0;
-% msk_cp(fix(mid_cp(2)),:)=0;
+%% display curves
 
-% msk_vz(:,fix(mid_cp(1)))=0;
-% msk_vz(fix(mid_cp(2)),:)=0;
-
-rgn_cp_masked = rgn_cp & msk_cp;
-rgn_vz_masked = rgn_vz & msk_vz;
-
+rgn_cp_masked = rgn_cp & msk_sectors;
+rgn_vz_masked = rgn_vz & msk_sectors;
 
 [B_cp, L_cp,~,~]=bwboundaries(rgn_cp_masked,8);
 [B_vz, L_vz,~,~]=bwboundaries(rgn_vz_masked,8);
@@ -116,83 +99,96 @@ plotcontours(fi,B_vz,'vz')
 legend show
 
 %% pairing by nearest
-pairings = find_pairing(B_vz,B_cp,sz);
-for ii=1:length(pairings)
-    vzpts = B_vz{pairings(ii,1)};
-    cppts = B_cp{pairings(ii,2)};
 
-    fi=figure(2);
+pairings = find_pairing(B_vz,B_cp);
+
+% display each pair
+for ii=1:length(pairings)
+    vzpts = B_vz{pairings(ii).vz};
+    cppts = B_cp{pairings(ii).cp};
+
+    figure(2);
     imshow(img)
     hold on
     
     plot(vzpts(:,2),vzpts(:,1),'-','linewidth',2)
     plot(cppts(:,2),cppts(:,1),'-','linewidth',2)
-    title(num2str(pairings(ii,:)))
+    title(num2str(struct2array(pairings(ii))))
     hold off
     pause
 end
 
 %% 
 % pairing cp-n and vz-n
-selected = struct('cp',[],'vz',[],'sgn',1);
 
-idx = 2;
 % encl = enclosing(B_cp{pairings(idx,2)},B_vz{pairings(idx,1)},sz);
-selected(idx) = struct('cp',pairings(idx,2),'vz',pairings(idx,1), 'sgn',1);
-
 
 % FIXME - try sgn = -1 (default 1)
 
 % selected(2) = struct('cp',[2,-6],'vz',1,'vz_within_cp',false,'sgn',1);
 % to show that 3 is a child of 2
 
-%% Match side A of VZ and side B of CP
-% depending on Vz_within_cp (usually true -> A is inner, B is outer)
+%% find side A of VZ and side B of CP (group_points), then
+% make normals to vz using spline fitting (match_contours), then
+% measure on lmapdata, then
+% find the vz and cp point on each profile line, then
+% filter the profile lines by angle and span, then
+% plot the lines
 
-sel = selected(idx)
-selmsk_cp = select_in_labelmatrix(L_cp,sel.cp);
-selmsk_vz = select_in_labelmatrix(L_vz,sel.vz);
-[val_cp, cen_cp] = group_points(B_cp(abs(sel.cp)),selmsk_cp,'pts');
-[val_vz, cen_vz] = group_points(B_vz(abs(sel.vz)),selmsk_vz,'bbox');
-
-
-%%
-boximg = 0*rgn_cp;
-boximg(:,1)=1;
-boximg(:,end)=1;
-boximg(1,:)=1;
-boximg(end,:)=1;
-DM = bwdist(boximg);
-
-contour_cp = struct('bpts',B_cp(abs(sel.cp)),'val',val_cp');
-
-contour_vz = struct('bpts',B_vz(abs(sel.vz)),'val',val_vz');
-
-[profilelines,vz_pts, cp_pts] = match_contours(contour_cp,contour_vz, DM, sel.sgn,sz);
-
-% figure(fi),hold on
-figure(2),imshow(dispimg,[])
-hold on
-plot(vz_pts(:,2),vz_pts(:,1),'rx') %,'linewidth',2)
-plot(cen_vz(:,2),cen_vz(:,1),'rs')
-
-plot(cp_pts(:,2),cp_pts(:,1),'bx') %,'linewidth',2)
-hold off
-
-%%
-profiledatalist = measure_profiledata(lmapdata, msk_cp, profilelines,mpp);
-% bs/secno/structure
-% pt1,pt2,len
-
-fi = plotprofiles(combined, profilelines, profiledatalist);
-
-
-%%
 outputdir = [datadir '/' num2str(imgno) '_marked2'];
 mkdir(outputdir)
-writeprofilecsv(outputdir,selnames,'1',profiledatalist)
-saveas(fi,[outputdir '/markings-1.png'])
-save([outputdir '/data-1.mat'],"profiledatalist",'profilelines')
+
+for idx = 4:4 % 1:length(pairings)
+
+    sel = pairings(idx)
+    selmsk_cp = select_in_labelmatrix(L_cp,sel.cp);
+    selmsk_vz = select_in_labelmatrix(L_vz,sel.vz);
+    
+    % slow function ahead
+    [val_cp, cen_cp] = group_points(B_cp(abs(sel.cp)),selmsk_cp,'bbox');
+    [val_vz, cen_vz] = group_points(B_vz(abs(sel.vz)),selmsk_vz,'bbox');
+    
+    
+    boximg = 0*rgn_cp;
+    boximg(:,1)=1;
+    boximg(:,end)=1;
+    boximg(1,:)=1;
+    boximg(end,:)=1;
+    DM = bwdist(boximg);
+    
+    contour_cp = struct('bpts',B_cp(abs(sel.cp)),'val',val_cp');
+    
+    contour_vz = struct('bpts',B_vz(abs(sel.vz)),'val',val_vz');
+    sgn = 1;
+    [profilelines,vz_pts, cp_pts] = match_contours(contour_cp,contour_vz, DM, sgn, sz);
+    
+    % figure(fi),hold on
+    figure(2),imshow(dispimg,[])
+    hold on
+    plot(vz_pts(:,2),vz_pts(:,1),'rx') %,'linewidth',2)
+    plot(cen_vz(2),cen_vz(1),'rs')
+    
+    plot(cp_pts(:,2),cp_pts(:,1),'bx') %,'linewidth',2)
+    plot(cen_cp(2),cen_cp(1),'bs')
+    hold off
+    
+    
+    profiledatalist = measure_profiledata(lmapdata, [], profilelines,mpp);
+    % bs/secno/structure
+    % pt1,pt2,len
+    [profilelines2, angles,spans] = update_profilelines(profilelines,profiledatalist);
+    
+    valid = filter_profilelines(angles, spans);
+    
+    fi = plotprofiles(combined, profilelines2,profiledatalist,valid);
+    writeprofilecsv(outputdir,selnames,num2str(idx),profiledatalist)
+    % saveas(fi,sprintf('%s/markings-%d.png',outputdir,idx))
+    exportgraphics(gca,sprintf('%s/markings-%d.png',outputdir,idx))
+    save(sprintf('%s/data-%d.mat',outputdir,idx),"profiledatalist",'profilelines')
+
+end
+
+%%
 
 %%
 % % pairing cp-2 and vz-2

@@ -9,8 +9,8 @@ function [pt_labels,centroids] = group_points(B_k,L_k,centroid_method)
 
     pt_labels = {};
     centroids = {};
+    sz = size(L_k);
     
-    % visited = false(size(mask));
         
     for k = 1:length(B_k) % nested hole boundaries
         
@@ -45,14 +45,21 @@ function [pt_labels,centroids] = group_points(B_k,L_k,centroid_method)
 %         profileimg = imdilate(bwperim(L==k),strel("square",2));
         profileimg = L_k;
         pt_labels{k}=[];
+        
+%         visited = false(sz);
         for ii = 1:length(boundpts)
 
             pt = boundpts(ii,:); % r,c;
-
+%             if visited(pt(1),pt(2))
+%                 continue
+%             end
             X = [cen_x;pt(2)];
             Y = [cen_y;pt(1)];
 
-            lp = improfile(profileimg,X,Y);
+            [cx,cy,lp] = improfile(profileimg,X,Y);
+%             vidx = sub2ind(sz,fix(cy),fix(cx));
+
+%             visited(vidx)=1;
 
             nres = sum(lp);
             if length(lp)>5
