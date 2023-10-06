@@ -138,7 +138,7 @@ end
 outputdir = [datadir '/' num2str(imgno) '_marked2'];
 mkdir(outputdir)
 
-for idx = 4:4 % 1:length(pairings)
+for idx = 1:length(pairings)
 
     sel = pairings(idx)
     selmsk_cp = select_in_labelmatrix(L_cp,sel.cp);
@@ -183,8 +183,15 @@ for idx = 4:4 % 1:length(pairings)
     fi = plotprofiles(combined, profilelines2,profiledatalist,valid);
     writeprofilecsv(outputdir,selnames,num2str(idx),profiledatalist)
     % saveas(fi,sprintf('%s/markings-%d.png',outputdir,idx))
+    tl = min([cp_pts;vz_pts],[],1);
+    br = max([cp_pts;vz_pts],[],1);
+    ax = gca;
+    ax.XLim=[tl(2)-20,br(2)+20];
+    ax.YLim=[tl(1)-20,br(1)+20];
     exportgraphics(gca,sprintf('%s/markings-%d.png',outputdir,idx))
-    save(sprintf('%s/data-%d.mat',outputdir,idx),"profiledatalist",'profilelines')
+    validprofilelines = profilelines2(valid);
+    validprofiledatalist = profiledatalist(valid,:);
+    save(sprintf('%s/data-%d.mat',outputdir,idx),"validprofiledatalist",'validprofilelines')
 
 end
 
