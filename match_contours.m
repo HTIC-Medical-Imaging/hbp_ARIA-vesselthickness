@@ -12,6 +12,7 @@ function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, DM
     if ~vz_within_cp
         cls_cp = 1;
         cls_vz = 2;
+        sgn = -1; % FIXME: why?
     end
 
     cp_pts = [];

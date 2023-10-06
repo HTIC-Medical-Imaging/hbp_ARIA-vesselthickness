@@ -1,12 +1,19 @@
-
+function method2(biosampleid, imgno,dbg)
 % bs  | brain name
 % ''''''''''''''''
 % 147 | FB36
 % 141 | FB40
 % 203 | FB63
 
-biosampleid=203;
-imgno = 394;
+if nargin < 3
+    dbg=false;
+end
+
+if nargin==0
+    biosampleid=203;
+    imgno = 394;
+    dbg = true;
+end
 
 % structuremasks folder available in gdrive (along with google sheet of section numbers)
 % https://drive.google.com/drive/folders/1-rmj_KNIhZlMbnpa3myh9o_1k5nHhByR?usp=sharing
@@ -102,20 +109,22 @@ legend show
 
 pairings = find_pairing(B_vz,B_cp);
 
-% display each pair
-for ii=1:length(pairings)
-    vzpts = B_vz{pairings(ii).vz};
-    cppts = B_cp{pairings(ii).cp};
-
-    figure(2);
-    imshow(img)
-    hold on
+if dbg
+    % display each pair
+    for ii=1:length(pairings)
+        vzpts = B_vz{pairings(ii).vz};
+        cppts = B_cp{pairings(ii).cp};
     
-    plot(vzpts(:,2),vzpts(:,1),'-','linewidth',2)
-    plot(cppts(:,2),cppts(:,1),'-','linewidth',2)
-    title(num2str(struct2array(pairings(ii))))
-    hold off
-    pause
+        figure(2);
+        imshow(img)
+        hold on
+        
+        plot(vzpts(:,2),vzpts(:,1),'-','linewidth',2)
+        plot(cppts(:,2),cppts(:,1),'-','linewidth',2)
+        title(num2str(struct2array(pairings(ii))))
+        hold off
+        pause
+    end
 end
 
 %% 
@@ -138,15 +147,28 @@ end
 outputdir = [datadir '/' num2str(imgno) '_marked2'];
 mkdir(outputdir)
 
-for idx = 1:length(pairings)
-
+for idx = 9:9 % 1:length(pairings)
+    
     sel = pairings(idx)
     selmsk_cp = select_in_labelmatrix(L_cp,sel.cp);
     selmsk_vz = select_in_labelmatrix(L_vz,sel.vz);
     
     % slow function ahead
-    [val_cp, cen_cp] = group_points(B_cp(abs(sel.cp)),selmsk_cp,'bbox');
-    [val_vz, cen_vz] = group_points(B_vz(abs(sel.vz)),selmsk_vz,'bbox');
+    cppts_all = B_cp(sel.cp); % interior + exterior , + nested boundaries
+    vzpts_all = B_vz(sel.vz);
+
+    npts_cp = 0;
+    for k=1:length(cppts_all)
+        npts_cp = npts_cp + length(cppts_all{k});
+    end
+    npts_vz = 0;
+    for k=1:length(vzpts_all)
+        npts_vz = npts_vz + length(vzpts_all{k});
+    end
+    fprintf('idx:%d, npts_cp:%d, npts_vz:%d\n', idx,npts_cp,npts_vz)
+
+    [val_cp, cen_cp] = group_points(cppts_all,selmsk_cp,'bbox');
+    [val_vz, cen_vz] = group_points(vzpts_all,selmsk_vz,'bbox');
     
     
     boximg = 0*rgn_cp;
@@ -156,12 +178,24 @@ for idx = 1:length(pairings)
     boximg(end,:)=1;
     DM = bwdist(boximg);
     
-    contour_cp = struct('bpts',B_cp(abs(sel.cp)),'val',val_cp');
+    contour_cp = struct('bpts',cppts_all,'val',val_cp');
     
-    contour_vz = struct('bpts',B_vz(abs(sel.vz)),'val',val_vz');
+    contour_vz = struct('bpts',vzpts_all,'val',val_vz');
+
+    if isempty(contour_vz) || isempty(contour_cp)
+        fprintf('idx:%d, group_points with too few points. skipping\n', idx)
+        continue
+    end
+    
     sgn = 1;
     [profilelines,vz_pts, cp_pts] = match_contours(contour_cp,contour_vz, DM, sgn, sz);
     
+    fprintf('npts_contour_cp:%d, npts_contour_vz:%d\n',length(cp_pts),length(vz_pts))
+    fprintf('nlines:%d\n',length(profilelines))
+    
+    tl = min([cp_pts;vz_pts],[],1);
+    br = max([cp_pts;vz_pts],[],1);
+
     % figure(fi),hold on
     figure(2),imshow(dispimg,[])
     hold on
@@ -172,27 +206,32 @@ for idx = 1:length(pairings)
     plot(cen_cp(2),cen_cp(1),'bs')
     hold off
     
-    
-    profiledatalist = measure_profiledata(lmapdata, [], profilelines,mpp);
-    % bs/secno/structure
-    % pt1,pt2,len
-    [profilelines2, angles,spans] = update_profilelines(profilelines,profiledatalist);
-    
-    valid = filter_profilelines(angles, spans);
-    
-    fi = plotprofiles(combined, profilelines2,profiledatalist,valid);
-    writeprofilecsv(outputdir,selnames,num2str(idx),profiledatalist)
-    % saveas(fi,sprintf('%s/markings-%d.png',outputdir,idx))
-    tl = min([cp_pts;vz_pts],[],1);
-    br = max([cp_pts;vz_pts],[],1);
     ax = gca;
     ax.XLim=[tl(2)-20,br(2)+20];
     ax.YLim=[tl(1)-20,br(1)+20];
-    exportgraphics(gca,sprintf('%s/markings-%d.png',outputdir,idx))
-    validprofilelines = profilelines2(valid);
-    validprofiledatalist = profiledatalist(valid,:);
-    save(sprintf('%s/data-%d.mat',outputdir,idx),"validprofiledatalist",'validprofilelines')
 
+    if ~isempty(profilelines)
+        profiledatalist = measure_profiledata(lmapdata, [], profilelines,mpp);
+        % bs/secno/structure
+        % pt1,pt2,len
+        [profilelines2, angles,spans] = update_profilelines(profilelines,profiledatalist);
+        
+    
+        valid = filter_profilelines(angles, spans);
+        
+        fi = plotprofiles(combined, profilelines2,profiledatalist,valid);
+
+        % saveas(fi,sprintf('%s/markings-%d.png',outputdir,idx))
+        figure(fi)
+        ax = gca;
+        ax.XLim=[tl(2)-20,br(2)+20];
+        ax.YLim=[tl(1)-20,br(1)+20];
+        writeprofilecsv(outputdir,selnames,num2str(idx),profiledatalist)
+        exportgraphics(gca,sprintf('%s/markings-%d.png',outputdir,idx))
+        validprofilelines = profilelines2(valid);
+        validprofiledatalist = profiledatalist(valid,:);
+        save(sprintf('%s/data-%d.mat',outputdir,idx),"validprofiledatalist",'validprofilelines')
+    end
 end
 
 %%
