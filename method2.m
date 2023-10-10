@@ -147,40 +147,54 @@ end
 outputdir = [datadir '/' num2str(imgno) '_marked2'];
 mkdir(outputdir)
 
-for idx = 9:9 % 1:length(pairings)
+boximg = 0*rgn_cp;
+boximg(:,1)=1;
+boximg(:,end)=1;
+boximg(1,:)=1;
+boximg(end,:)=1;
+DM = bwdist(boximg);
+
+for idx = 1:length(pairings)
     
     sel = pairings(idx)
     selmsk_cp = select_in_labelmatrix(L_cp,sel.cp);
     selmsk_vz = select_in_labelmatrix(L_vz,sel.vz);
     
     % slow function ahead
-    cppts_all = B_cp(sel.cp); % interior + exterior , + nested boundaries
-    vzpts_all = B_vz(sel.vz);
+    cppts_all = cell2mat(B_cp(sel.cp)); % interior + exterior , + nested boundaries
+    vzpts_all = cell2mat(B_vz(sel.vz));
 
-    npts_cp = 0;
-    for k=1:length(cppts_all)
-        npts_cp = npts_cp + length(cppts_all{k});
-    end
-    npts_vz = 0;
-    for k=1:length(vzpts_all)
-        npts_vz = npts_vz + length(vzpts_all{k});
-    end
+    npts_cp = length(cppts_all);
+    npts_vz = length(vzpts_all);
+
     fprintf('idx:%d, npts_cp:%d, npts_vz:%d\n', idx,npts_cp,npts_vz)
+    
+    figure(2),imshow(dispimg,[])
+    hold on
+    plot(vzpts_all(:,2),vzpts_all(:,1),'rx') %,'linewidth',2)
+    
+    plot(cppts_all(:,2),cppts_all(:,1),'bx') %,'linewidth',2)
+    
+    hold off
 
-    [val_cp, cen_cp] = group_points(cppts_all,selmsk_cp,'bbox');
-    [val_vz, cen_vz] = group_points(vzpts_all,selmsk_vz,'bbox');
+    tl = min([cppts_all;vzpts_all],[],1);
+    br = max([cppts_all;vzpts_all],[],1);
+
+    rgnmsk = false(sz);
+    rgnmsk(tl(1):br(1),tl(2):br(2))=1;
+
+    ax = gca;
+    ax.XLim=[tl(2)-20,br(2)+20];
+    ax.YLim=[tl(1)-20,br(1)+20];
+
+    [val_cp, cen_cp] = group_points(B_cp(sel.cp),selmsk_cp,rgnmsk,'bbox');
+    [val_vz, cen_vz] = group_points(B_vz(sel.vz),selmsk_vz,rgnmsk,'passed',cen_cp);
     
     
-    boximg = 0*rgn_cp;
-    boximg(:,1)=1;
-    boximg(:,end)=1;
-    boximg(1,:)=1;
-    boximg(end,:)=1;
-    DM = bwdist(boximg);
     
-    contour_cp = struct('bpts',cppts_all,'val',val_cp');
+    contour_cp = struct('bpts',cppts_all,'val',val_cp','cen',cen_cp);
     
-    contour_vz = struct('bpts',vzpts_all,'val',val_vz');
+    contour_vz = struct('bpts',vzpts_all,'val',val_vz','cen',cen_vz);
 
     if isempty(contour_vz) || isempty(contour_cp)
         fprintf('idx:%d, group_points with too few points. skipping\n', idx)
@@ -188,13 +202,11 @@ for idx = 9:9 % 1:length(pairings)
     end
     
     sgn = 1;
-    [profilelines,vz_pts, cp_pts] = match_contours(contour_cp,contour_vz, DM, sgn, sz);
+    [profilelines,vz_pts, cp_pts] = match_contours(contour_cp,contour_vz, DM, sgn);
     
     fprintf('npts_contour_cp:%d, npts_contour_vz:%d\n',length(cp_pts),length(vz_pts))
     fprintf('nlines:%d\n',length(profilelines))
     
-    tl = min([cp_pts;vz_pts],[],1);
-    br = max([cp_pts;vz_pts],[],1);
 
     % figure(fi),hold on
     figure(2),imshow(dispimg,[])

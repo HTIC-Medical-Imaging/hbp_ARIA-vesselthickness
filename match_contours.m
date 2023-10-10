@@ -1,12 +1,14 @@
-function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, DM, sgn, shp,sp_piece_spacing)
+function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, DM, sgn,sp_piece_spacing)
 
 % int => closer to ventricle (interior)
 % ext => closer to surface (exterior)
     
-    if nargin == 5
+    if nargin == 4
         sp_piece_spacing = 51;
     end
-    vz_within_cp = enclosing(contour_cp.bpts,contour_vz.bpts,shp) | within_box(contour_cp.bpts,contour_vz.bpts)
+    shp = size(DM);
+
+    vz_within_cp = enclosing([contour_cp.bpts;contour_cp.cen],contour_vz.bpts, shp) | within_box([contour_cp.bpts;contour_cp.cen],contour_vz.bpts)
     cls_cp = 2;
     cls_vz = 1;
     if ~vz_within_cp
@@ -40,19 +42,19 @@ function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, DM
                 selpts = pplist(j).smoothedpts(20:10:end,:);
                 selnormals = pplist(j).normals(20:10:end,:);
                 % quiver(selpts(:,2),selpts(:,1),selnormals(:,2),selnormals(:,1),3);
-                ind = sub2ind(size(DM),fix(selpts(:,1)),fix(selpts(:,2)));
+                ind = sub2ind(shp,fix(selpts(:,1)),fix(selpts(:,2)));
     
                 length_multiplier = 1.5; % FIXME
                 lengths = sgn*DM(ind)*length_multiplier;
                 
                 % p2 = p1+ul
                 otherpts = get_boundedpts([selpts(:,1) + selnormals(:,1).*lengths, ...
-                             selpts(:,2) + selnormals(:,2).*lengths],size(DM));
+                             selpts(:,2) + selnormals(:,2).*lengths],shp);
                 
                 length_multiplier_back = 10;  % FIXME 
                 npix_back = sgn*length_multiplier_back;
                 startpts = get_boundedpts([selpts(:,1)-selnormals(:,1)*npix_back,...
-                            selpts(:,2)-selnormals(:,2)*npix_back],size(DM));
+                            selpts(:,2)-selnormals(:,2)*npix_back],shp);
     
                 for k=1:length(selpts)
                     ln_k=struct('p1',startpts(k,:), 'p2',otherpts(k,:),'u',selnormals(k,:));
@@ -74,6 +76,9 @@ function [lineslist, vz_pts, cp_pts] = match_contours(contour_cp, contour_vz, DM
 %%
 function lbl = label_boundindices(val, niter)
     if nargin==1
+        niter = 1;
+    end
+    if niter < 1
         niter = 1;
     end
     lbl_int = val(:,2)==0;
@@ -98,7 +103,7 @@ function RC2 = get_boundedpts(RC,siz)
     RC2 = [R2,C2];
 
 %%
-function out = enclosing(pts_cp,pts_vz,shp)
+function out = enclosing(pts_cp,pts_vz, shp)
     
     cp_hull = hull_mask(pts_cp,shp,1);
     pts_vz_lin = sub2ind(shp,pts_vz(:,1),pts_vz(:,2));
